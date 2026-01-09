@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useEffect, useState } from "react";
+import ScoreInput from "../ScoreInput";
+import AssignCourtButton from "../AssignCourtButton";
 
 export function MatchesTab({ tournamentId }: { tournamentId: string }) {
   const [matches, setMatches] = useState<any[]>([]);
-  const [courts, setCourts] = useState<any[]>([]);
 
   async function fetchMatches(id: string) {
     await fetch(`/api/matches?tournamentId=${id}`)
@@ -12,33 +13,17 @@ export function MatchesTab({ tournamentId }: { tournamentId: string }) {
       .then(setMatches);
   }
 
-  async function fetchCourts(id: string) {
-    await fetch(`/api/courts?tournamentId=${id}`)
-      .then((res) => res.json())
-      .then(setCourts);
-  }
-
   useEffect(() => {
     fetchMatches(tournamentId);
-    fetchCourts(tournamentId);
   }, [tournamentId]);
 
-  async function assignCourt(matchId: string, courtId: string) {
-    if (!matchId) {
-      console.error("matchId is undefined");
-      return;
-    }
-
-    if (!courtId) return;
-
-    await fetch(`/api/matches/${matchId}`, {
+  const startMatch = async (matchId: string) => {
+    await fetch(`/api/matches/${matchId}/start`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ court_id: courtId }),
     });
 
     fetchMatches(tournamentId);
-  }
+  };
 
   return (
     <div>
@@ -50,26 +35,52 @@ export function MatchesTab({ tournamentId }: { tournamentId: string }) {
             {m.playerA?.full_name || "TBD"} vs {m.playerB?.full_name || "TBD"}
           </div>
 
-          <div className="text-sm text-gray-500 mb-2">
-            Round: {m.round} | Status: {m.status}
-          </div>
-
-          {/* Assign Court */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm">Court:</span>
-            <select
-              value={m.court_id || ""}
-              onChange={(e) => assignCourt(m.id, e.target.value)}
-              className="border px-2 py-1 rounded text-sm"
+          <div className="text-sm text-gray-500">
+            Round: {m.round} | Status:{" "}
+            <span
+              className={`px-2 py-1 rounded text-sm ${
+                m.status === "pending"
+                  ? "bg-gray-200"
+                  : m.status === "playing"
+                  ? "bg-yellow-200 text-yellow-800"
+                  : "bg-green-200 text-green-800"
+              }`}
             >
-              <option value="">-- Select Court --</option>
-              {courts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              {m.status}
+            </span>
           </div>
+          <div className="text-sm text-gray-500 mb-2">
+            Court: {m.court.name ?? "-"}
+          </div>
+          {m.status === "pending" && (
+            <AssignCourtButton
+              matchId={m.id}
+              action={() => fetchMatches(tournamentId)}
+            />
+          )}
+
+          {m.status === "ready" && (
+            <button
+              className="bg-green-600 text-white px-3 py-1 rounded"
+              onClick={() => startMatch(m.id)}
+            >
+              Start Match
+            </button>
+          )}
+
+          {m.status === "playing" && (
+            <ScoreInput
+              matchId={m.id}
+              onAction={() => fetchMatches(tournamentId)}
+            />
+          )}
+
+          {m.status === "finished" && (
+            <div className="text-green-600 font-medium">
+              Winner:{" "}
+              {m.winner === m.player_a ? m.playerA?.full_name : m.playerB?.full_name}
+            </div>
+          )}
         </div>
       ))}
     </div>

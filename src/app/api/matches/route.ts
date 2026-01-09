@@ -12,8 +12,9 @@ export async function GET() {
     score_b,
     player_a,
     player_b,
-    playerA:player_a ( id, full_name ),
-    playerB:player_b ( id, full_name )
+    playerA:player_a ( full_name ),
+    playerB:player_b ( full_name ),
+    court:court_id ( name )
   `);
 
   if (error)

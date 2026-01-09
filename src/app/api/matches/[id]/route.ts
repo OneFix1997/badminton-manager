@@ -1,29 +1,50 @@
-import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { NextResponse } from "next/server";
 
-type Params = {
-  params: Promise<{ id: string }>;
-};
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await req.json();
 
-export async function PATCH(req: Request, { params }: Params) {
-  const { id } = await params; // ⭐ สำคัญมาก (Next.js 14+)
+  const { score_a, score_b } = body;
 
-  if (!id) {
-    return NextResponse.json({ error: "Missing match id" }, { status: 400 });
+  if (score_a == null || score_b == null) {
+    return NextResponse.json(
+      { error: "score_a and score_b are required" },
+      { status: 400 }
+    );
   }
 
-  const body = await req.json();
+  const { data: match, error: fetchError } = await supabase
+    .from("matches")
+    .select("player_a, player_b")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !match) {
+    return NextResponse.json({ error: "Match not found" }, { status: 404 });
+  }
+
+  let winner = null;
+  if (score_a > score_b) winner = match.player_a;
+  if (score_b > score_a) winner = match.player_b;
 
   const { data, error } = await supabase
     .from("matches")
-    .update(body)
+    .update({
+      score_a,
+      score_b,
+      winner,
+      status: "finished",
+    })
     .eq("id", id)
     .select()
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 400 });
 
   return NextResponse.json(data);
 }
